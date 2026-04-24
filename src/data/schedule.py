@@ -11,7 +11,19 @@ from ..constants import MLB_STATS_API, YANKEES_TEAM_ID
 
 
 def _get(path: str, params: Optional[dict] = None) -> dict:
-    r = requests.get(f"{MLB_STATS_API}{path}", params=params, timeout=30)
+    try:
+        r = requests.get(f"{MLB_STATS_API}{path}", params=params, timeout=30)
+    except requests.RequestException as e:
+        raise RuntimeError(
+            f"Could not reach MLB Stats API ({MLB_STATS_API}{path}): {e}. "
+            "Check your network connection."
+        ) from e
+    if r.status_code == 403:
+        raise RuntimeError(
+            f"MLB Stats API returned 403 for {path}. If you're behind a "
+            "restrictive proxy or sandbox, run this on a machine with "
+            "unrestricted outbound HTTPS."
+        )
     r.raise_for_status()
     return r.json()
 

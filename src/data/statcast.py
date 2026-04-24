@@ -6,6 +6,8 @@ then derive per-player xwOBA and EV50 (median exit velocity on batted balls).
 
 from __future__ import annotations
 
+from datetime import date
+
 import pandas as pd
 
 from .cache import cached
@@ -20,7 +22,11 @@ def _season_statcast(season: int) -> pd.DataFrame:
     def fetch():
         pyb = _import_pyb()
         start = f"{season}-03-15"
-        end = f"{season}-11-05"
+        today = date.today()
+        end_dt = date(season, 11, 5)
+        if today < end_dt:
+            end_dt = today
+        end = end_dt.isoformat()
         df = pyb.statcast(start_dt=start, end_dt=end)
         keep = [
             "game_date",
@@ -36,31 +42,7 @@ def _season_statcast(season: int) -> pd.DataFrame:
         keep = [c for c in keep if c in df.columns]
         return df[keep]
 
-    return cached(f"statcast_{season}", _season_statcast_fallback(season))
-
-
-def _season_statcast_fallback(season: int):
-    """Wrap fetch with a loader that tolerates partial-year 404s silently."""
-    def inner():
-        pyb = _import_pyb()
-        start = f"{season}-03-15"
-        end = f"{season}-11-05"
-        df = pyb.statcast(start_dt=start, end_dt=end)
-        keep = [
-            "game_date",
-            "batter",
-            "pitcher",
-            "events",
-            "estimated_woba_using_speedangle",
-            "woba_value",
-            "launch_speed",
-            "type",
-            "description",
-        ]
-        keep = [c for c in keep if c in df.columns]
-        return df[keep]
-
-    return inner
+    return cached(f"statcast_{season}", fetch)
 
 
 def batter_aggregates(season: int) -> pd.DataFrame:
