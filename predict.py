@@ -65,7 +65,17 @@ def predict(game_row: pd.Series) -> dict:
     return project(target, prior_season=target.year - 1, current_season=target.year)
 
 
-def main(on: str, as_json: bool = False) -> int:
+def main(on: str, as_json: bool = False, demo: bool = False) -> int:
+    if demo:
+        from datetime import datetime as _dt
+
+        from src.orchestrator import project
+
+        target = _dt.strptime(on, "%Y-%m-%d").date()
+        result = project(target, prior_season=target.year - 1, current_season=target.year)
+        print(json.dumps(result, default=str, indent=2) if as_json else render(result))
+        return 0
+
     print(f"Fetching MLB games for {on}...")
     sched = get_games(on)
     df = parse_games(sched)
@@ -89,5 +99,15 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--date", default=date.today().strftime("%Y-%m-%d"))
     p.add_argument("--json", action="store_true")
+    p.add_argument(
+        "--demo",
+        action="store_true",
+        help="Run end-to-end against a canned fixture (no network required).",
+    )
     args = p.parse_args()
-    raise SystemExit(main(args.date, as_json=args.json))
+    if args.demo:
+        from src import demo
+
+        demo.install()
+        args.date = demo.DEMO_DATE
+    raise SystemExit(main(args.date, as_json=args.json, demo=args.demo))
