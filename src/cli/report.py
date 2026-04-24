@@ -9,7 +9,7 @@ def _fmt_pct(p: float) -> str:
     return f"{p * 100:5.1f}%"
 
 
-def render(result: dict) -> str:
+def render(result: dict, detail: bool = False) -> str:
     lines: list[str] = []
     g = result["game"]
     w = result.get("weather")
@@ -58,14 +58,17 @@ def render(result: dict) -> str:
     )
     lines.append("")
 
+    header = _detail_header if detail else _lineup_header
+    rows = _detail_rows if detail else _lineup_rows
+
     lines.append(f"Yankees lineup vs {result['opposing_sp']}")
-    lines.append(_lineup_header())
-    lines.extend(_lineup_rows(nyy["lineup"]))
+    lines.append(header())
+    lines.extend(rows(nyy["lineup"]))
     lines.append("")
 
     lines.append(f"{opp['team']} lineup vs {result['yankees_sp']}")
-    lines.append(_lineup_header())
-    lines.extend(_lineup_rows(opp["lineup"]))
+    lines.append(header())
+    lines.extend(rows(opp["lineup"]))
     lines.append("=" * 86)
     return "\n".join(lines)
 
@@ -93,6 +96,29 @@ def _lineup_rows(lineup: Iterable[dict]) -> list[str]:
             f"{_f(props.get('exp_hits')):>5} "
             f"{_f(props.get('exp_tb')):>5} "
             f"{_f(props.get('exp_hr'), digits=2):>5}"
+        )
+    return rows
+
+
+def _detail_header() -> str:
+    return (
+        f"{'#':>2} {'B':>1}/{'vs':<2} {'Batter':<22} "
+        f"{'xwOBA':>6} {'wOBA':>6} {'EV':>6} {'wRC+':>6} {'mWOBA':>6}"
+    )
+
+
+def _detail_rows(lineup: Iterable[dict]) -> list[str]:
+    rows = []
+    for i, row in enumerate(lineup, start=1):
+        bats = (row.get("bats") or "?")[0]
+        stand = (row.get("stand_vs_sp") or "?")[0]
+        rows.append(
+            f"{i:>2} {bats}/{stand:<2} {row['name'][:22]:<22} "
+            f"{row.get('comp_xwOBA', 0):>6.3f} "
+            f"{row.get('comp_wOBA', 0):>6.3f} "
+            f"{row.get('comp_EV', 0):>6.3f} "
+            f"{row.get('comp_wRCplus', 0):>6.3f} "
+            f"{row['matchup_wOBA']:>6.3f}"
         )
     return rows
 

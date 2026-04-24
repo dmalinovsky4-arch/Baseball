@@ -65,7 +65,7 @@ def predict(game_row: pd.Series) -> dict:
     return project(target, prior_season=target.year - 1, current_season=target.year)
 
 
-def main(on: str, as_json: bool = False, demo: bool = False) -> int:
+def main(on: str, as_json: bool = False, demo: bool = False, detail: bool = False) -> int:
     if demo:
         from datetime import datetime as _dt
 
@@ -73,7 +73,7 @@ def main(on: str, as_json: bool = False, demo: bool = False) -> int:
 
         target = _dt.strptime(on, "%Y-%m-%d").date()
         result = project(target, prior_season=target.year - 1, current_season=target.year)
-        print(json.dumps(result, default=str, indent=2) if as_json else render(result))
+        print(json.dumps(result, default=str, indent=2) if as_json else render(result, detail=detail))
         return 0
 
     print(f"Fetching MLB games for {on}...")
@@ -91,7 +91,7 @@ def main(on: str, as_json: bool = False, demo: bool = False) -> int:
         return 0
 
     result = predict(yankees.iloc[0])
-    print(json.dumps(result, default=str, indent=2) if as_json else render(result))
+    print(json.dumps(result, default=str, indent=2) if as_json else render(result, detail=detail))
     return 0
 
 
@@ -104,10 +104,15 @@ if __name__ == "__main__":
         action="store_true",
         help="Run end-to-end against a canned fixture (no network required).",
     )
+    p.add_argument(
+        "--detail",
+        action="store_true",
+        help="Show per-batter breakdown of xwOBA / wOBA / EV / wRC+ components.",
+    )
     args = p.parse_args()
     if args.demo:
         from src import demo
 
         demo.install()
         args.date = demo.DEMO_DATE
-    raise SystemExit(main(args.date, as_json=args.json, demo=args.demo))
+    raise SystemExit(main(args.date, as_json=args.json, demo=args.demo, detail=args.detail))

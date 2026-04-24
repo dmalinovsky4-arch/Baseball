@@ -355,6 +355,11 @@ def _build_matchup(
 
     combined_woba = SP_WEIGHT * m_sp["matchup_wOBA"] + BULLPEN_WEIGHT * m_bp["matchup_wOBA"]
 
+    components = {
+        k: SP_WEIGHT * m_sp[k] + BULLPEN_WEIGHT * m_bp[k]
+        for k in ("xwOBA_mu", "wOBA_mu", "EV_mu", "wRC_mu")
+    }
+
     avg = blend(
         Sample(fg_c.get("PA", 0), fg_c.get("AVG")),
         Sample(fg_p.get("PA", 0), fg_p.get("AVG")) if fg_p else None,
@@ -382,6 +387,10 @@ def _build_matchup(
         "sp_matchup_wOBA": m_sp["matchup_wOBA"],
         "bp_matchup_wOBA": m_bp["matchup_wOBA"],
         "matchup_wOBA": combined_woba,
+        "comp_xwOBA": components["xwOBA_mu"],
+        "comp_wOBA": components["wOBA_mu"],
+        "comp_EV": components["EV_mu"],
+        "comp_wRCplus": components["wRC_mu"],
         "blended_avg": avg,
         "blended_slg": slg,
         "blended_hr_per_pa": hr_rate,

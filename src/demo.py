@@ -27,12 +27,12 @@ GAME = {
     "home_team": "Houston Astros",
     "away_probable_id": 608331,
     "away_probable": "Max Fried",
-    "home_probable_id": 664285,
-    "home_probable": "Framber Valdez",
+    "home_probable_id": 593372,
+    "home_probable": "Lance McCullers Jr.",
     "yankees_home": False,
 }
 
-PITCHER_THROWS = {608331: "L", 664285: "L"}
+PITCHER_THROWS = {608331: "L", 593372: "R"}
 
 NYY_LINEUP = [
     {"order": 1, "player_id": 592450, "name": "Aaron Judge",          "position": "CF", "bats": "R"},
@@ -95,7 +95,7 @@ def _fg_pitcher(name, tbf, woba, fip_minus):
 
 FG_PITCHERS = pd.DataFrame([
     _fg_pitcher("Max Fried",          732, 0.283, 84),
-    _fg_pitcher("Framber Valdez",     786, 0.296, 94),
+    _fg_pitcher("Lance McCullers Jr.", 305, 0.315, 104),
 ])
 
 
@@ -141,10 +141,11 @@ def _sc_pitcher_row(pid, pa, xwoba, ev, pa_l, x_l, ev_l, pa_r, x_r, ev_r):
 
 
 SC_PITCHERS = pd.DataFrame([
-    # Max Fried (LHP): much tougher on LHB (short track record but strong splits).
+    # Max Fried (LHP): much tougher on LHB.
     _sc_pitcher_row(608331, 730, 0.295, 88.0, 180, 0.255, 86.8, 550, 0.308, 88.4),
-    # Framber Valdez (LHP): big sinkerballer, good vs both, slight LHB advantage.
-    _sc_pitcher_row(664285, 780, 0.303, 88.4, 175, 0.268, 87.2, 605, 0.313, 88.7),
+    # Lance McCullers Jr. (RHP): returning from injury; modest sample.
+    # Curveball-heavy, slightly better vs RHB than LHB (changeup keeps LHB honest).
+    _sc_pitcher_row(593372, 300, 0.315, 88.6, 145, 0.328, 89.1, 155, 0.302, 88.1),
 ])
 
 
@@ -155,7 +156,7 @@ MLBAM_BY_NAME = {
     "Jose Altuve": 514888, "Isaac Paredes": 670541, "Yordan Alvarez": 670542,
     "Christian Walker": 572233, "Jeremy Pena": 665161, "Yainer Diaz": 673237,
     "Cam Smith": 676801, "Mauricio Dubon": 643289, "Jake Meyers": 676694,
-    "Max Fried": 608331, "Framber Valdez": 664285,
+    "Max Fried": 608331, "Lance McCullers Jr.": 593372,
 }
 
 
