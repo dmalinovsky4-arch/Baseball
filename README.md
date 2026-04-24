@@ -93,9 +93,26 @@ data/
 - **Park factors** live in `data/park_factors.csv` — edit freely.
 - **Weather response** (temp/wind multipliers) lives in `src/data/weather.py`.
 
+## Modeling choices
+
+- **Bullpen weighting**: each batter's matchup wOBA is a 55/45 blend of
+  "vs opposing SP" and "vs opposing bullpen" (team-aggregated relievers,
+  TBF-weighted, defined as G − GS ≥ 10 and GS/G < 0.3).
+- **Handedness splits**: Statcast batter/pitcher aggregates are produced
+  three ways (overall, vs L, vs R). At matchup time we pick the split that
+  matches the pitcher's throwing hand and the batter's stand (switch hitters
+  use opposite). wOBA and wRC+ are scaled by the xwOBA split ratio since
+  FanGraphs doesn't expose native splits via pybaseball. Falls back to
+  overall if a split has <40 PA.
+- **Park orientation**: `cf_bearing_deg` in `data/park_factors.csv` is the
+  bearing from home plate to center field. Wind direction (from Open-Meteo)
+  is projected onto that axis; positive dot product = tailwind (boost),
+  negative = headwind (suppression). Every +10 mph of true tailwind ≈ +3%
+  runs.
+
 ## Roadmap
 
 - Backtest harness against last 1–3 seasons to tune stat weights.
-- Handedness splits (vs-LHP / vs-RHP).
-- Bullpen model for innings 6–9.
+- Per-reliever handedness mix for bullpens (currently treated as
+  right-handed-bias overall).
 - Sportsbook odds pull for +EV flagging.

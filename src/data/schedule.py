@@ -68,6 +68,18 @@ def _flatten_game(g: dict, game_date: str) -> dict:
     }
 
 
+def pitcher_throws(player_id: int) -> Optional[str]:
+    """Return 'L' or 'R' for pitcher's throwing hand, or None."""
+    if not player_id:
+        return None
+    data = _get(f"/people/{player_id}")
+    people = data.get("people", [])
+    if not people:
+        return None
+    hand = (people[0].get("pitchHand") or {}).get("code")
+    return hand if hand in {"L", "R"} else None
+
+
 def venue_location(venue_id: int) -> Optional[dict]:
     data = _get(f"/venues/{venue_id}", {"hydrate": "location"})
     venues = data.get("venues", [])

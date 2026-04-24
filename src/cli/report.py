@@ -14,20 +14,32 @@ def render(result: dict) -> str:
     g = result["game"]
     w = result.get("weather")
     park = result["park_factor"]
+    cfb = result.get("cf_bearing_deg")
 
-    lines.append("=" * 78)
+    lines.append("=" * 86)
     lines.append(
         f"YANKEES PROJECTION — {g['date']}  |  {g['away_team']} @ {g['home_team']}"
     )
-    lines.append(f"Venue: {g['venue_name']}   Park factor: {park:.2f}")
+    park_line = f"Venue: {g['venue_name']}   Park factor: {park:.2f}"
+    if cfb is not None:
+        park_line += f"   CF bearing: {cfb:.0f}°"
+    lines.append(park_line)
     if w:
         lines.append(
-            f"Weather: {w.get('temp_f'):.0f}°F  "
-            f"wind {w.get('wind_mph'):.0f} mph  "
-            f"mult {result['weather_mult']:.2f}"
+            f"Weather: {_n(w.get('temp_f'), 0)}°F  "
+            f"wind {_n(w.get('wind_mph'), 0)} mph from {_n(w.get('wind_from_deg'), 0)}°  "
+            f"mult {result['weather_mult']:.3f}"
         )
     else:
         lines.append("Weather: n/a (dome or fetch failed)")
+    lines.append("")
+
+    sp_hand_opp = result.get("opposing_sp_throws") or "?"
+    sp_hand_nyy = result.get("yankees_sp_throws") or "?"
+    lines.append(
+        f"Yankees SP: {result['yankees_sp']} ({sp_hand_nyy})    "
+        f"Opp SP: {result['opposing_sp']} ({sp_hand_opp})"
+    )
     lines.append("")
 
     nyy = result["yankees"]
@@ -50,14 +62,15 @@ def render(result: dict) -> str:
     lines.append(f"{opp['team']} lineup vs {result['yankees_sp']}")
     lines.append(_lineup_header())
     lines.extend(_lineup_rows(opp["lineup"]))
-    lines.append("=" * 78)
+    lines.append("=" * 86)
     return "\n".join(lines)
 
 
 def _lineup_header() -> str:
     return (
-        f"{'#':>2}  {'Batter':<22} {'mWOBA':>6} {'PA':>4} "
-        f"{'H':>5} {'TB':>5} {'HR':>5}"
+        f"{'#':>2} {'B':>1}/{'vs':<2} {'Batter':<22} "
+        f"{'mWOBA':>6} {'vSP':>6} {'vBP':>6} "
+        f"{'PA':>4} {'H':>5} {'TB':>5} {'HR':>5}"
     )
 
 
@@ -65,9 +78,13 @@ def _lineup_rows(lineup: Iterable[dict]) -> list[str]:
     rows = []
     for i, row in enumerate(lineup, start=1):
         props = row.get("props", {})
+        bats = (row.get("bats") or "?")[0]
+        stand = (row.get("stand_vs_sp") or "?")[0]
         rows.append(
-            f"{i:>2}  {row['name'][:22]:<22} "
+            f"{i:>2} {bats}/{stand:<2} {row['name'][:22]:<22} "
             f"{row['matchup_wOBA']:>6.3f} "
+            f"{row.get('sp_matchup_wOBA', 0):>6.3f} "
+            f"{row.get('bp_matchup_wOBA', 0):>6.3f} "
             f"{props.get('exp_PA', 0):>4.1f} "
             f"{_f(props.get('exp_hits')):>5} "
             f"{_f(props.get('exp_tb')):>5} "
@@ -79,4 +96,10 @@ def _lineup_rows(lineup: Iterable[dict]) -> list[str]:
 def _f(v, digits: int = 2) -> str:
     if v is None:
         return "  -  "
+    return f"{v:.{digits}f}"
+
+
+def _n(v, digits: int = 1) -> str:
+    if v is None:
+        return "?"
     return f"{v:.{digits}f}"

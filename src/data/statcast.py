@@ -2,6 +2,11 @@
 
 For each season we pull the full season's pitch-level data once and cache it,
 then derive per-player xwOBA and EV50 (median exit velocity on batted balls).
+
+Aggregates are produced three ways:
+  - overall
+  - vs LHP (for batters) / vs LHB (for pitchers)
+  - vs RHP (for batters) / vs RHB (for pitchers)
 """
 
 from __future__ import annotations
@@ -32,6 +37,8 @@ def _season_statcast(season: int) -> pd.DataFrame:
             "game_date",
             "batter",
             "pitcher",
+            "stand",
+            "p_throws",
             "events",
             "estimated_woba_using_speedangle",
             "woba_value",
@@ -46,47 +53,56 @@ def _season_statcast(season: int) -> pd.DataFrame:
 
 
 def batter_aggregates(season: int) -> pd.DataFrame:
-    """Per-batter xwOBA and EV50 for `season`."""
     def build():
         df = _season_statcast(season)
-        return _aggregate(df, id_col="batter")
+        overall = _aggregate(df, id_col="batter", suffix="")
+        vs_l = _aggregate(df[df.get("p_throws") == "L"], id_col="batter", suffix="_vs_L")
+        vs_r = _aggregate(df[df.get("p_throws") == "R"], id_col="batter", suffix="_vs_R")
+        return _merge(overall, vs_l, vs_r, id_col="batter")
 
-    return cached(f"statcast_batters_{season}", build)
+    return cached(f"statcast_batters_v2_{season}", build)
 
 
 def pitcher_aggregates(season: int) -> pd.DataFrame:
-    """Per-pitcher xwOBA allowed and EV50 allowed for `season`."""
     def build():
         df = _season_statcast(season)
-        return _aggregate(df, id_col="pitcher")
+        overall = _aggregate(df, id_col="pitcher", suffix="")
+        vs_l = _aggregate(df[df.get("stand") == "L"], id_col="pitcher", suffix="_vs_L")
+        vs_r = _aggregate(df[df.get("stand") == "R"], id_col="pitcher", suffix="_vs_R")
+        return _merge(overall, vs_l, vs_r, id_col="pitcher")
 
-    return cached(f"statcast_pitchers_{season}", build)
+    return cached(f"statcast_pitchers_v2_{season}", build)
 
 
-def _aggregate(df: pd.DataFrame, id_col: str) -> pd.DataFrame:
-    if df.empty:
-        return pd.DataFrame(columns=[id_col, "xwOBA", "EV50", "PA", "BBE"])
+def _aggregate(df: pd.DataFrame, id_col: str, suffix: str) -> pd.DataFrame:
+    cols = [f"PA{suffix}", f"xwOBA{suffix}", f"EV50{suffix}", f"BBE{suffix}"]
+    if df is None or df.empty:
+        return pd.DataFrame(columns=[id_col, *cols])
 
     pa_mask = df["woba_value"].notna()
-    pa = df[pa_mask].groupby(id_col).size().rename("PA")
-
+    pa = df[pa_mask].groupby(id_col).size().rename(f"PA{suffix}")
     xwoba = (
         df[pa_mask]
         .groupby(id_col)["estimated_woba_using_speedangle"]
         .mean()
-        .rename("xwOBA")
+        .rename(f"xwOBA{suffix}")
     )
-
     bbe = df[df["launch_speed"].notna()]
-    ev50 = bbe.groupby(id_col)["launch_speed"].median().rename("EV50")
-    bbe_count = bbe.groupby(id_col).size().rename("BBE")
+    ev50 = bbe.groupby(id_col)["launch_speed"].median().rename(f"EV50{suffix}")
+    bbe_count = bbe.groupby(id_col).size().rename(f"BBE{suffix}")
+    return pd.concat([pa, xwoba, ev50, bbe_count], axis=1).reset_index()
 
-    out = pd.concat([pa, xwoba, ev50, bbe_count], axis=1).reset_index()
+
+def _merge(overall: pd.DataFrame, vs_l: pd.DataFrame, vs_r: pd.DataFrame, id_col: str) -> pd.DataFrame:
+    out = overall
+    for df in (vs_l, vs_r):
+        if df is None or df.empty:
+            continue
+        out = out.merge(df, on=id_col, how="outer")
     return out
 
 
 def lookup_mlbam(name: str) -> int | None:
-    """Resolve a player name to their MLBAM ID via pybaseball."""
     def fetch():
         pyb = _import_pyb()
         parts = name.strip().split()
@@ -102,18 +118,39 @@ def lookup_mlbam(name: str) -> int | None:
     return cached(f"mlbam_{name.lower().replace(' ', '_')}", fetch)
 
 
-def row_for(agg: pd.DataFrame, mlbam_id: int | None, id_col: str) -> dict | None:
+def row_for(agg: pd.DataFrame, mlbam_id: int | None, id_col: str, split: str = "") -> dict | None:
+    """Return {PA, xwOBA, EV50} for a player, optionally pulling a split.
+
+    split: "" (overall), "_vs_L", or "_vs_R"
+    Falls back to overall if the split's PA sample is too small (<40).
+    """
     if agg is None or agg.empty or mlbam_id is None:
         return None
     match = agg[agg[id_col] == mlbam_id]
     if match.empty:
         return None
     r = match.iloc[0]
-    return {
-        "PA": _num(r.get("PA"), 0),
-        "xwOBA": _num(r.get("xwOBA")),
-        "EV50": _num(r.get("EV50")),
-    }
+
+    def pick(col: str):
+        return _num(r.get(f"{col}{split}")) if split else _num(r.get(col))
+
+    pa = pick("PA") or 0
+    xwoba = pick("xwOBA")
+    ev50 = pick("EV50")
+    if split and (pa < 40 or xwoba is None):
+        pa = _num(r.get("PA")) or 0
+        xwoba = _num(r.get("xwOBA"))
+        ev50 = _num(r.get("EV50"))
+    return {"PA": pa, "xwOBA": xwoba, "EV50": ev50}
+
+
+def overall_xwoba(agg: pd.DataFrame, mlbam_id: int | None, id_col: str) -> float | None:
+    if agg is None or agg.empty or mlbam_id is None:
+        return None
+    match = agg[agg[id_col] == mlbam_id]
+    if match.empty:
+        return None
+    return _num(match.iloc[0].get("xwOBA"))
 
 
 def _num(v, default=None):

@@ -1,14 +1,23 @@
 """Game-time weather via Open-Meteo (no API key required).
 
-We translate wind/temp into a run-scoring multiplier. Rules of thumb from
-public park-effect work:
-- Every 10 F above 70 F adds ~1% to run scoring (warm air = more carry).
-- Tailwind (out-to-center) of 10 mph adds ~3% runs; headwind symmetric.
-- Dome / closed roof → neutral (multiplier 1.00).
+Run multiplier combines three effects:
+- Temperature: ~+1% runs per +10 F above 70 F (warm air = more carry).
+- Wind magnitude projected onto the home-plate -> CF axis:
+    dot = cos(wind_dir_deg - cf_bearing_deg) * wind_mph
+    positive dot  -> wind blowing OUT to CF (carry boost)
+    negative dot  -> wind blowing IN from CF (suppression)
+  Each +10 mph of true tailwind adds ~3% runs; same magnitude the other way
+  removes ~3%.
+- Domes / closed roofs -> neutral (multiplier = 1.00).
+
+Wind direction returned by Open-Meteo is the bearing the wind is coming FROM
+(meteorological convention). We add 180 to get the direction it's blowing
+TO before projecting onto the CF axis.
 """
 
 from __future__ import annotations
 
+import math
 from datetime import date
 from typing import Optional
 
@@ -50,30 +59,36 @@ def fetch(lat: float, lon: float, on: date) -> Optional[dict]:
     temps = data.get("temperature_2m", [])
     winds = data.get("wind_speed_10m", [])
     dirs = data.get("wind_direction_10m", [])
-    # Target first pitch ~ 19:00 local.
     idx = min(range(len(times)), key=lambda i: abs(int(times[i][-5:-3]) - 19)) if times else None
     if idx is None:
         return None
     return {
         "temp_f": temps[idx] if idx < len(temps) else None,
         "wind_mph": winds[idx] if idx < len(winds) else None,
-        "wind_dir_deg": dirs[idx] if idx < len(dirs) else None,
+        "wind_from_deg": dirs[idx] if idx < len(dirs) else None,
     }
 
 
-def multiplier(venue_name: str, w: Optional[dict]) -> float:
+def multiplier(venue_name: str, w: Optional[dict], cf_bearing_deg: Optional[float]) -> float:
     if venue_name in DOMES or w is None:
         return 1.00
     mult = 1.00
     temp = w.get("temp_f")
     wind = w.get("wind_mph")
+    wind_from = w.get("wind_from_deg")
+
     if temp is not None:
         mult *= 1.0 + ((temp - 70.0) / 10.0) * 0.01
-    if wind is not None:
-        # Without knowing park orientation, treat any wind >15 mph as a mild
-        # carry boost and <5 as mild suppression. Good enough for v1.
+
+    if wind is not None and wind_from is not None and cf_bearing_deg is not None:
+        wind_to = (wind_from + 180.0) % 360.0
+        delta = math.radians(wind_to - cf_bearing_deg)
+        dot = math.cos(delta) * wind
+        mult *= 1.0 + (dot / 10.0) * 0.03
+    elif wind is not None:
         if wind >= 15:
-            mult *= 1.02
+            mult *= 1.01
         elif wind <= 5:
-            mult *= 0.99
+            mult *= 0.995
+
     return max(0.85, min(1.15, mult))
