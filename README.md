@@ -104,15 +104,20 @@ data/
   use opposite). wOBA and wRC+ are scaled by the xwOBA split ratio since
   FanGraphs doesn't expose native splits via pybaseball. Falls back to
   overall if a split has <40 PA.
-- **Park orientation**: `cf_bearing_deg` in `data/park_factors.csv` is the
-  bearing from home plate to center field. Wind direction (from Open-Meteo)
-  is projected onto that axis; positive dot product = tailwind (boost),
-  negative = headwind (suppression). Every +10 mph of true tailwind ≈ +3%
-  runs.
+- **Park factors by handedness**: `data/park_factors.csv` has five columns
+  per venue — `runs`, `hr_L`, `hr_R`, `hits_L`, `hits_R`. The runs factor
+  scales team expected runs; the HR and hits factors scale each batter's
+  HR and hit prop projections using the batter's effective stand vs the
+  opposing SP. This captures dimensional asymmetries (e.g., Yankee Stadium's
+  short RF porch: `hr_L` = 1.24, `hr_R` = 1.05; Fenway's Green Monster:
+  `hits_R` = 1.12, `hr_L` = 0.88; Oracle Park's RF triples alley: `hr_L`
+  = 0.68). Values are approximate 3-year Statcast blends — edit freely.
 
 ## Roadmap
 
 - Backtest harness against last 1–3 seasons to tune stat weights.
 - Per-reliever handedness mix for bullpens (currently treated as
   right-handed-bias overall).
+- Apply park HR/hits factors inside matchup wOBA too, not just at the
+  prop level, once backtesting confirms the lift.
 - Sportsbook odds pull for +EV flagging.

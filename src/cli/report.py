@@ -14,20 +14,24 @@ def render(result: dict) -> str:
     g = result["game"]
     w = result.get("weather")
     park = result["park_factor"]
-    cfb = result.get("cf_bearing_deg")
 
     lines.append("=" * 86)
     lines.append(
         f"YANKEES PROJECTION — {g['date']}  |  {g['away_team']} @ {g['home_team']}"
     )
-    park_line = f"Venue: {g['venue_name']}   Park factor: {park:.2f}"
-    if cfb is not None:
-        park_line += f"   CF bearing: {cfb:.0f}°"
+    park_line = f"Venue: {g['venue_name']}   Runs: {park:.2f}"
+    if result.get("venue_known"):
+        park_line += (
+            f"   HR L/R: {result['park_hr_L']:.2f}/{result['park_hr_R']:.2f}"
+            f"   Hits L/R: {result['park_hits_L']:.2f}/{result['park_hits_R']:.2f}"
+        )
+    else:
+        park_line += "   (venue missing from park_factors.csv — neutral fallback)"
     lines.append(park_line)
     if w:
         lines.append(
             f"Weather: {_n(w.get('temp_f'), 0)}°F  "
-            f"wind {_n(w.get('wind_mph'), 0)} mph from {_n(w.get('wind_from_deg'), 0)}°  "
+            f"wind {_n(w.get('wind_mph'), 0)} mph  "
             f"mult {result['weather_mult']:.3f}"
         )
     else:

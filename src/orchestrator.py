@@ -91,15 +91,16 @@ def project(target: date, prior_season: int, current_season: int) -> dict:
         for b in opp_lineup[:9]
     ]
 
-    park = park_factors.run_factor(game["venue_name"])
-    cf_bearing = park_factors.cf_bearing(game["venue_name"])
+    venue = game["venue_name"] or ""
+    park = park_factors.run_factor(venue)
+    venue_known = park_factors.is_known(venue)
     w = None
     wmult = 1.00
     if game.get("venue_id"):
         loc = schedule.venue_location(game["venue_id"])
         if loc and loc.get("lat") and loc.get("lon"):
             w = weather.fetch(loc["lat"], loc["lon"], target)
-            wmult = weather.multiplier(game["venue_name"] or "", w, cf_bearing)
+            wmult = weather.multiplier(venue, w)
 
     nyy_proj = project_team_runs(nyy_matchups, park, wmult)
     opp_proj = project_team_runs(opp_matchups, park, wmult)
@@ -107,9 +108,17 @@ def project(target: date, prior_season: int, current_season: int) -> dict:
     opp_proj.team = opp_team_name
 
     for row in nyy_proj.lineup:
-        row["props"] = batter_props(row)
+        row["props"] = batter_props(
+            row,
+            park_hits=park_factors.hits_factor(venue, row.get("stand_vs_sp")),
+            park_hr=park_factors.hr_factor(venue, row.get("stand_vs_sp")),
+        )
     for row in opp_proj.lineup:
-        row["props"] = batter_props(row)
+        row["props"] = batter_props(
+            row,
+            park_hits=park_factors.hits_factor(venue, row.get("stand_vs_sp")),
+            park_hr=park_factors.hr_factor(venue, row.get("stand_vs_sp")),
+        )
 
     return {
         "game": game,
@@ -118,7 +127,11 @@ def project(target: date, prior_season: int, current_season: int) -> dict:
         "opposing_sp": opp_sp_name or "TBD",
         "opposing_sp_throws": opp_sp_throws,
         "park_factor": park,
-        "cf_bearing_deg": cf_bearing,
+        "park_hr_L": park_factors.hr_factor(venue, "L"),
+        "park_hr_R": park_factors.hr_factor(venue, "R"),
+        "park_hits_L": park_factors.hits_factor(venue, "L"),
+        "park_hits_R": park_factors.hits_factor(venue, "R"),
+        "venue_known": venue_known,
         "weather": w,
         "weather_mult": wmult,
         "yankees": {
